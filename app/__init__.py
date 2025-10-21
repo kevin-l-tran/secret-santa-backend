@@ -3,7 +3,7 @@ from flask_cors import CORS
 from flask_socketio import SocketIO
 from dotenv import load_dotenv
 
-socketio: SocketIO
+socketio = SocketIO()
 load_dotenv()
 
 
@@ -13,8 +13,6 @@ def create_app(config_object="config.DevelopmentConfig") -> Flask:
 
     with app.app_context():
         CORS(app, origins=[current_app.config["FRONTEND_URL"]])
-
-        socketio = SocketIO(cors_allowed_origins=current_app.config["FRONTEND_URL"])
-        socketio.init_app(app)
+        socketio.init_app(app, cors_allowed_origins=current_app.config["FRONTEND_URL"])
 
     return app
