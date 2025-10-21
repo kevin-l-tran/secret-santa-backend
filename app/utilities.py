@@ -16,6 +16,14 @@ class Room:
         self.host = host
         self.participants = [host]
 
+    def __eq__(self, other: any) -> bool:
+        if not isinstance(other, Room):
+            return NotImplemented
+        return self.id == other.id
+
+    def __hash__(self) -> int:
+        return hash(self.id)
+
     def add_member(self, participant: Participant) -> bool:
         if participant.name not in [p.name for p in self.participants]:
             self.participants.append(participant)
