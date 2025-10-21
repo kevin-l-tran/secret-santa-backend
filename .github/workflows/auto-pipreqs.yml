@@ -1,0 +1,50 @@
+name: Auto-generate requirements.txt with pipreqs
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "**/*.py"
+
+permissions:
+  contents: write
+
+jobs:
+  pipreqs:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pipreqs
+        run: pip install pipreqs
+
+      - name: Generate requirements.txt
+        run: |
+          pipreqs . --force --savepath requirements.txt
+
+      - name: Install and freeze exact versions
+        run: |
+          pip install -r requirements.txt
+          pip freeze | sed '/^-e /d' > requirements.txt
+
+      - name: Check if requirements.txt changed
+        id: git_diff
+        run: |
+          if git diff --quiet requirements.txt; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push changes
+        if: steps.git_diff.outputs.changed == 'true'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: updated requirements.txt [skip ci]"
+          file_pattern: "requirements.txt"
