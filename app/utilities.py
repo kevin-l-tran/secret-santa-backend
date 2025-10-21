@@ -22,3 +22,17 @@ class Room:
             return True
         else:
             return False
+
+
+# ------------ Helpers ------------
+def new_code(n):
+    alphabet = string.ascii_uppercase + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(n))
+
+
+def knuth_shuffle(list: list[any]):
+    length = len(list)
+    for i in range(0, length - 1):
+        j = secrets.choice(range(i, length))
+        list[i], list[j] = list[j], list[i]
+    return list
