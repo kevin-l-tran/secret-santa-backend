@@ -23,11 +23,17 @@ def test_create_room_success(sio):
 def test_create_room_without_name(sio):
     # Act
     sio.emit("create_room", {})
-    received = sio.get_received()
+    received_no_name = sio.get_received()
+    sio.emit("create_room", {"name": "    "})
+    received_whitespace = sio.get_received()
 
     # Assert: event output
-    payload = _get_packet(received, "error")
-    assert payload is not None and f"Got: {received}"
+    payload = _get_packet(received_no_name, "error")
+    assert payload is not None and f"Got: {received_no_name}"
+    assert payload["message"] == "Name required"
+
+    payload = _get_packet(received_whitespace, "error")
+    assert payload is not None and f"Got: {received_whitespace}"
     assert payload["message"] == "Name required"
 
     # Assert: in-memory state not updated
