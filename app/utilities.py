@@ -1,11 +1,12 @@
 import secrets
 import string
 
-from typing import TypedDict
+from dataclasses import dataclass
 
 
 # ------------ Room & participant classes ------------
-class Participant(TypedDict):
+@dataclass
+class Participant:
     sid: str
     name: str
 
