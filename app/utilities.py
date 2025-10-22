@@ -12,7 +12,7 @@ class Participant:
 
 
 class Room:
-    def __init__(self, id: str, host: Participant):
+    def __init__(self, id: str, host: Participant) -> None:
         self.id = id
         self.host = host
         self.participants = [host]
@@ -26,14 +26,14 @@ class Room:
 
 
 # ------------ Helpers ------------
-def new_code(n):
+def new_code(n) -> str:
     alphabet = string.ascii_letters + string.digits
     return "".join(secrets.choice(alphabet) for _ in range(n))
 
 
-def knuth_shuffle(list: list[any]):
-    length = len(list)
+def knuth_shuffle(l: list[any]) -> list[any]:
+    length = len(l)
     for i in range(0, length - 1):
         j = secrets.choice(range(i, length))
-        list[i], list[j] = list[j], list[i]
-    return list
+        l[i], l[j] = l[j], l[i]
+    return l
