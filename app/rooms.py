@@ -13,6 +13,10 @@ SID_TO_ROOM: dict[str, Room] = {}
 # ------------ Socket events ------------
 @socketio.on("create_room")
 def on_create_room(data) -> None:
+    # Enforces single room membership
+    if SID_TO_ROOM.get(request.sid):
+        return emit("error", {"message": "Already in a room"})
+    
     name = (data.get("name") or "").strip()
     if not name:
         return emit("error", {"message": "Name required"})
