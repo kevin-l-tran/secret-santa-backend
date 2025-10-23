@@ -7,6 +7,7 @@ from . import socketio
 
 # ------------ In-memory state (RAM only) ------------
 ROOMS: dict[str, Room] = {}
+SID_TO_ROOM: dict[str, Room] = {}
 
 
 # ------------ Socket events ------------
@@ -19,15 +20,16 @@ def on_create_room(data) -> None:
     host = Participant(sid=request.sid, name=name)
 
     rid = new_code(current_app.config["ROOM_ID_LENGTH"])
-    room = Room(id=rid, host=host)
+    room = Room(host=host)
 
     ROOMS[rid] = room
+    SID_TO_ROOM[request.sid] = room
 
     join_room(rid)
     emit(
         "room_created",
         {
-            "room_id": room.id,
+            "room_id": rid,
             "participants": [p.name for p in room.participants],
             "host_name": host.name,
         },
@@ -42,6 +44,10 @@ def on_join_room(data) -> None:
         return emit("error", {"message": "Room ID required"})
     if rid not in ROOMS:
         return emit("error", {"message": "Room not found"})
+    
+    # Enforces single room membership
+    if SID_TO_ROOM.get(request.sid):
+        return emit("error", {"message": "Already in a room"})
 
     room = ROOMS[rid]
 
@@ -54,9 +60,11 @@ def on_join_room(data) -> None:
     participant = Participant(sid=request.sid, name=name)
     room.add_member(participant)
 
+    SID_TO_ROOM[request.sid] = room
+
     join_room(rid)
     emit("joined", {"name": name}, to=rid)
-    _broadcast_room_update(room.id)
+    _broadcast_room_update(rid)
 
 
 # ------------ Helpers ------------

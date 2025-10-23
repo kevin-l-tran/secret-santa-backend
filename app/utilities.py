@@ -12,8 +12,7 @@ class Participant:
 
 
 class Room:
-    def __init__(self, id: str, host: Participant) -> None:
-        self.id = id
+    def __init__(self, host: Participant) -> None:
         self.host = host
         self.participants = [host]
 

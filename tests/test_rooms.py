@@ -16,7 +16,6 @@ def test_create_room_success(sio):
     # Assert: in-memory state updated
     room = rooms.ROOMS[payload["room_id"]]
     assert len(rooms.ROOMS) == 1
-    assert room.id == payload["room_id"]
     assert room.host.name == payload["host_name"]
     assert [p.name for p in room.participants] == ["Alice"]
 
@@ -84,7 +83,6 @@ def test_join_room_success(make_sios):
     # Assert: in-memory state updated
     room = rooms.ROOMS[payload["room_id"]]
     assert len(rooms.ROOMS) == 1
-    assert room.id == payload["room_id"]
     assert room.host.name == payload["host_name"]
     assert [p.name for p in room.participants] == ["Alice", "Bob"]
 
@@ -181,7 +179,6 @@ def test_multiple_join_room_success(make_sios):
 
         payload = _get_packet(received, "room_update")
         assert payload is not None, f"Got: {received}"
-        assert payload["room_id"] == rid
         assert payload["participants"] == ["Alice"] + [str(i) for i in range(i + 1)]
         assert payload["host_name"] == "Alice"
 
