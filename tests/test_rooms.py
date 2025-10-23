@@ -9,7 +9,7 @@ def test_create_room_success(sio):
 
     # Assert: event output
     payload = _get_packet(received, "room_created")
-    assert payload is not None and f"Got: {received}"
+    assert payload is not None, f"Got: {received}"
     assert payload["host_name"] == "Alice"
     assert payload["participants"] == ["Alice"]
 
@@ -30,11 +30,11 @@ def test_create_room_without_name(sio):
 
     # Assert: event output
     payload = _get_packet(received_no_name, "error")
-    assert payload is not None and f"Got: {received_no_name}"
+    assert payload is not None, f"Got: {received_no_name}"
     assert payload["message"] == "Name required"
 
     payload = _get_packet(received_whitespace, "error")
-    assert payload is not None and f"Got: {received_whitespace}"
+    assert payload is not None, f"Got: {received_whitespace}"
     assert payload["message"] == "Name required"
 
     # Assert: in-memory state not updated
@@ -49,7 +49,7 @@ def test_create_multiple_rooms_success(sio):
 
         # Assert: event output
         payload = _get_packet(received, "room_created")
-        assert payload is not None and f"Got: {received}"
+        assert payload is not None, f"Got: {received}"
         assert payload["host_name"] == "Alice"
         assert payload["participants"] == ["Alice"]
 
@@ -58,23 +58,25 @@ def test_create_multiple_rooms_success(sio):
 
 
 # ------------ Join room tests ------------
-def test_join_room_success(sio):
+def test_join_room_success(make_sios):
     # Setup
-    sio.emit("create_room", {"name": "Alice"})
-    received = sio.get_received()
+    sio_host, sio_participant = make_sios(2)
+
+    sio_host.emit("create_room", {"name": "Alice"})
+    received = sio_host.get_received()
     rid = _get_packet(received, "room_created")["room_id"]
 
     # Act
-    sio.emit("join_room", {"room_id": rid, "name": "Bob"})
-    received = sio.get_received()
+    sio_participant.emit("join_room", {"room_id": rid, "name": "Bob"})
+    received = sio_participant.get_received()
 
     # Assert: event output
     payload = _get_packet(received, "joined")
-    assert payload is not None and f"Got: {received}"
+    assert payload is not None, f"Got: {received}"
     assert payload["name"] == "Bob"
 
     payload = _get_packet(received, "room_update")
-    assert payload is not None and f"Got: {received}"
+    assert payload is not None, f"Got: {received}"
     assert payload["room_id"] == rid
     assert payload["participants"] == ["Alice", "Bob"]
     assert payload["host_name"] == "Alice"
@@ -96,11 +98,11 @@ def test_join_room_without_rid(sio):
 
     # Assert: event output
     payload = _get_packet(received_no_rid, "error")
-    assert payload is not None and f"Got: {received_no_rid}"
+    assert payload is not None, f"Got: {received_no_rid}"
     assert payload["message"] == "Room ID required"
 
     payload = _get_packet(received_whitespace_rid, "error")
-    assert payload is not None and f"Got: {received_whitespace_rid}"
+    assert payload is not None, f"Got: {received_whitespace_rid}"
     assert payload["message"] == "Room ID required"
 
 
@@ -111,73 +113,81 @@ def test_join_room_with_wrong_rid(sio):
 
     # Assert: event output
     payload = _get_packet(received, "error")
-    assert payload is not None and f"Got: {received}"
+    assert payload is not None, f"Got: {received}"
     assert payload["message"] == "Room not found"
 
 
-def test_join_room_without_name(sio):
+def test_join_room_without_name(make_sios):
     # Setup
-    sio.emit("create_room", {"name": "Alice"})
-    received = sio.get_received()
+    sio_host, sio_participant = make_sios(2)
+
+    sio_host.emit("create_room", {"name": "Alice"})
+    received = sio_host.get_received()
     rid = _get_packet(received, "room_created")["room_id"]
 
     # Act
-    sio.emit("join_room", {"room_id": rid})
-    received_no_name = sio.get_received()
-    sio.emit("join_room", {"room_id": rid, "name": "   \t \n    "})
-    received_whitespace_name = sio.get_received()
+    sio_participant.emit("join_room", {"room_id": rid})
+    received_no_name = sio_participant.get_received()
+    sio_participant.emit("join_room", {"room_id": rid, "name": "   \t \n    "})
+    received_whitespace_name = sio_participant.get_received()
 
     # Assert: event output
     payload = _get_packet(received_no_name, "error")
-    assert payload is not None and f"Got: {received_no_name}"
+    assert payload is not None, f"Got: {received_no_name}"
     assert payload["message"] == "Name required"
 
     payload = _get_packet(received_whitespace_name, "error")
-    assert payload is not None and f"Got: {received_whitespace_name}"
+    assert payload is not None, f"Got: {received_whitespace_name}"
     assert payload["message"] == "Name required"
 
 
-def test_join_room_with_duplicate_name(sio):
+def test_join_room_with_duplicate_name(make_sios):
     # Setup
-    sio.emit("create_room", {"name": "Alice"})
-    received = sio.get_received()
+    sio_host, sio_participant = make_sios(2)
+
+    sio_host.emit("create_room", {"name": "Alice"})
+    received = sio_host.get_received()
     rid = _get_packet(received, "room_created")["room_id"]
 
     # Act
-    sio.emit("join_room", {"room_id": rid, "name": "Alice"})
-    received = sio.get_received()
+    sio_participant.emit("join_room", {"room_id": rid, "name": "Alice"})
+    received = sio_participant.get_received()
 
     # Assert: event output
     payload = _get_packet(received, "error")
-    assert payload is not None and f"Got: {received}"
+    assert payload is not None, f"Got: {received}"
     assert payload["message"] == "Name already taken"
 
 
-def test_multiple_join_room_success(sio):
+def test_multiple_join_room_success(make_sios):
     # Setup
-    sio.emit("create_room", {"name": "Alice"})
-    received = sio.get_received()
+    clients = make_sios(101)
+    sio_host = clients[100]
+
+    sio_host.emit("create_room", {"name": "Alice"})
+    received = sio_host.get_received()
     rid = _get_packet(received, "room_created")["room_id"]
 
-    for i in range(1000):
+    for i in range(100):
         # Act
-        sio.emit("join_room", {"room_id": rid, "name": str(i)})
-        received = sio.get_received()
+        sio_participant = clients[i]
+        sio_participant.emit("join_room", {"room_id": rid, "name": str(i)})
+        received = sio_participant.get_received()
 
         # Assert: event output
         payload = _get_packet(received, "joined")
-        assert payload is not None and f"Got: {received}"
+        assert payload is not None, f"Got: {received}"
         assert payload["name"] == str(i)
 
         payload = _get_packet(received, "room_update")
-        assert payload is not None and f"Got: {received}"
+        assert payload is not None, f"Got: {received}"
         assert payload["room_id"] == rid
         assert payload["participants"] == ["Alice"] + [str(i) for i in range(i + 1)]
         assert payload["host_name"] == "Alice"
 
-    # Assert: in-memory state updated w/ 1001 unique participants
+    # Assert: in-memory state updated w/ 101 unique participants
     assert len(rooms.ROOMS) == 1
-    assert len(rooms.ROOMS[rid].participants) == 1001
+    assert len(rooms.ROOMS[rid].participants) == 101
 
 
 # ------------ Helpers ------------

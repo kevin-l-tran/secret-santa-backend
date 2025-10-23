@@ -19,6 +19,19 @@ def sio(app):
     return socketio.test_client(app, flask_test_client=app.test_client())
 
 
+@pytest.fixture
+def make_sios(app):
+    """Factory to create multiple independent Socket.IO test clients bound to the same app."""
+
+    def _make(count: int):
+        return [
+            socketio.test_client(app, flask_test_client=app.test_client())
+            for _ in range(count)
+        ]
+
+    return _make
+
+
 @pytest.fixture(autouse=True)
 def reset_rooms():
     """Clear in-memory state between tests."""
