@@ -61,7 +61,7 @@ def test_create_emit_does_not_leak(make_sios):
     assert _get_packet(b_batch, "room_created") is not None
 
 
-def test_create_multiple_rooms_success(make_sios):
+def test_multiple_create_rooms_success(make_sios):
     # Setup
     clients = make_sios(100)
 
@@ -391,8 +391,101 @@ def test_multiple_disconnects_success(make_sios):
     assert len(rooms.SID_TO_RID) == 0
 
 
+# ------------ Reveal giftees tests ------------
+def test_reveal_giftees_success(make_sios):
+    # Setup
+    clients = make_sios(101)
+    host = clients[100]
+
+    host.emit("create_room", {"name": "100"})  # easier to compare participant names
+    rid = _get_packet(host.get_received(), "room_created")["room_id"]
+
+    for i in range(100):
+        clients[i].emit("join_room", {"room_id": rid, "name": str(i)})
+
+    # Act
+    host.emit("reveal")
+
+    # Assert: participants recieve unique giftee assignment
+    seen_assignments = set()
+    for i in range(len(clients)):
+        received = clients[i].get_received()
+        payload = _get_packet(received, "revealed")
+
+        assert payload is not None, f"Got: {received}"
+        assert payload["giftee_name"] != str(i)  # ith client has name i
+        assert payload["giftee_name"] not in seen_assignments
+        seen_assignments.add(payload["giftee_name"])
+
+
+def test_reveal_with_no_room(sio):
+    # Act
+    sio.emit("reveal")
+    received = sio.get_received()
+
+    # Assert: event output
+    payload = _get_packet(received, "error")
+    assert payload is not None, f"Got: {received}"
+    assert payload["message"] == "Not in a room"
+
+
+def test_reveal_without_being_host(make_sios):
+    # Setup
+    host, participant = make_sios(2)
+    host.emit("create_room", {"name": "Alice"})
+    rid = _get_packet(host.get_received(), "room_created")["room_id"]
+
+    participant.emit("join_room", {"room_id": rid, "name": "Bob"})
+
+    # Act
+    participant.emit("reveal")
+    received = participant.get_received()
+
+    # Assert: event output
+    payload = _get_packet(received, "error")
+    assert payload is not None, f"Got: {received}"
+    assert payload["message"] == "Not the host"
+
+
+def test_reveal_without_enough_participants(sio):
+    # Setup
+    sio.emit("create_room", {"name": "Alice"})
+
+    # Act
+    sio.emit("reveal")
+    received = sio.get_received()
+
+    # Assert: event output
+    payload = _get_packet(received, "error")
+    assert payload is not None, f"Got: {received}"
+    assert payload["message"] == "Not enough participants"
+
+
+def test_reveal_emit_does_not_leak(make_sios):
+    # Setup
+    host1, participant, host2 = make_sios(3)
+
+    host1.emit("create_room", {"name": "Alice"})
+    rid = _get_packet(host1.get_received(), "room_created")["room_id"]
+    participant.emit("join_room", {"room_id": rid, "name": "Bob"})
+
+    host2.emit("create_room", {"name": "Alice"})
+
+    # Act
+    host1.emit("reveal")
+
+    # Assert: host1 gets events
+    a_batch = host1.get_received()
+    assert _get_packet(a_batch, "revealed")["giftee_name"] == "Bob"
+
+    # Assert: host2 gets nothing
+    b_batch = host2.get_received()
+    assert _get_packet(b_batch, "revealed") is None
+
+
 # ------------ Helpers ------------
 def _get_packet(received, name: str):
+    """Gets the first packet from received with specified name"""
     for pkt in received:
         if pkt.get("name") == name:
             # test_client packs event args in a list

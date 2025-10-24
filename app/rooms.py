@@ -1,7 +1,7 @@
 from flask import current_app, request
 from flask_socketio import emit, join_room
 
-from .utilities import Room, Participant, new_code
+from .utilities import Room, Participant, knuth_shuffle, new_code
 from . import socketio
 
 
@@ -99,6 +99,27 @@ def on_disconnect() -> None:
 
     emit("disconnected", {"name": participant.name}, to=rid)
     _broadcast_room_update(rid)
+
+
+@socketio.on("reveal")
+def on_reveal() -> None:
+    sid = request.sid
+
+    rid = SID_TO_RID.get(sid)
+    room = ROOMS.get(rid)
+    if not room:
+        return emit("error", {"message": "Not in a room"})
+
+    if room.host.sid != sid:
+        return emit("error", {"message": "Not the host"})
+
+    participants = room.participants
+    if len(participants) < 2:
+        return emit("error", {"message": "Not enough participants"})
+
+    giftees = knuth_shuffle(participants.copy())
+    for i in range(len(participants)):
+        emit("revealed", {"giftee_name": giftees[i].name}, to=participants[i].sid)
 
 
 # ------------ Helpers ------------

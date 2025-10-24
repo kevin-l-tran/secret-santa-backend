@@ -33,6 +33,6 @@ def new_code(n) -> str:
 def knuth_shuffle[T](ls: list[T]) -> list[T]:
     length = len(ls)
     for i in range(0, length - 1):
-        j = secrets.choice(range(i, length))
+        j = secrets.choice(range(i+1, length))
         ls[i], ls[j] = ls[j], ls[i]
     return ls
