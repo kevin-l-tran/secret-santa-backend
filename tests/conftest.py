@@ -36,7 +36,7 @@ def make_sios(app):
 def reset_rooms():
     """Clear in-memory state between tests."""
     rooms.ROOMS.clear()
-    rooms.SID_TO_ROOM.clear()
+    rooms.SID_TO_RID.clear()
     yield
     rooms.ROOMS.clear()
-    rooms.SID_TO_ROOM.clear()
+    rooms.SID_TO_RID.clear()

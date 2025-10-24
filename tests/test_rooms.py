@@ -18,9 +18,9 @@ def test_create_room_success(sio):
     assert len(rooms.ROOMS) == 1
     assert room.host.name == payload["host_name"]
     assert [p.name for p in room.participants] == ["Alice"]
-    
-    assert len(rooms.SID_TO_ROOM) == 1
-    assert rooms.SID_TO_ROOM[room.host.sid] == room
+
+    assert len(rooms.SID_TO_RID) == 1
+    assert rooms.SID_TO_RID[room.host.sid] == payload["room_id"]
 
 
 def test_create_room_without_name(sio):
@@ -61,7 +61,7 @@ def test_create_multiple_rooms_success(make_sios):
 
     # Assert: in-memory state updated w/ 100 unique rooms
     assert len(rooms.ROOMS) == 100
-    assert len(rooms.SID_TO_ROOM) == 100
+    assert len(rooms.SID_TO_RID) == 100
 
 
 # ------------ Join room tests ------------
@@ -94,9 +94,9 @@ def test_join_room_success(make_sios):
     assert room.host.name == payload["host_name"]
     assert [p.name for p in room.participants] == ["Alice", "Bob"]
 
-    assert len(rooms.SID_TO_ROOM) == 2
-    for sid in rooms.SID_TO_ROOM:
-        assert rooms.SID_TO_ROOM[sid] == room
+    assert len(rooms.SID_TO_RID) == 2
+    for sid in rooms.SID_TO_RID:
+        assert rooms.SID_TO_RID[sid] == payload["room_id"]
 
 
 def test_join_room_without_rid(sio):
@@ -197,7 +197,7 @@ def test_multiple_join_room_success(make_sios):
     # Assert: in-memory state updated w/ 101 unique participants
     assert len(rooms.ROOMS) == 1
     assert len(rooms.ROOMS[rid].participants) == 101
-    assert len(rooms.SID_TO_ROOM) == 101
+    assert len(rooms.SID_TO_RID) == 101
 
 
 # ------------ Helpers ------------

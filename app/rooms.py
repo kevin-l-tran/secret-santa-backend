@@ -7,16 +7,16 @@ from . import socketio
 
 # ------------ In-memory state (RAM only) ------------
 ROOMS: dict[str, Room] = {}
-SID_TO_ROOM: dict[str, Room] = {}
+SID_TO_RID: dict[str, str] = {}
 
 
 # ------------ Socket events ------------
 @socketio.on("create_room")
 def on_create_room(data) -> None:
     # Enforces single room membership
-    if SID_TO_ROOM.get(request.sid):
+    if SID_TO_RID.get(request.sid):
         return emit("error", {"message": "Already in a room"})
-    
+
     name = (data.get("name") or "").strip()
     if not name:
         return emit("error", {"message": "Name required"})
@@ -27,7 +27,7 @@ def on_create_room(data) -> None:
     room = Room(host=host)
 
     ROOMS[rid] = room
-    SID_TO_ROOM[request.sid] = room
+    SID_TO_RID[request.sid] = rid
 
     join_room(rid)
     emit(
@@ -48,9 +48,9 @@ def on_join_room(data) -> None:
         return emit("error", {"message": "Room ID required"})
     if rid not in ROOMS:
         return emit("error", {"message": "Room not found"})
-    
+
     # Enforces single room membership
-    if SID_TO_ROOM.get(request.sid):
+    if SID_TO_RID.get(request.sid):
         return emit("error", {"message": "Already in a room"})
 
     room = ROOMS[rid]
@@ -64,7 +64,7 @@ def on_join_room(data) -> None:
     participant = Participant(sid=request.sid, name=name)
     room.add_member(participant)
 
-    SID_TO_ROOM[request.sid] = room
+    SID_TO_RID[request.sid] = rid
 
     join_room(rid)
     emit("joined", {"name": name}, to=rid)
