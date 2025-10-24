@@ -30,9 +30,9 @@ def new_code(n) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(n))
 
 
-def knuth_shuffle(l: list[any]) -> list[any]:
-    length = len(l)
+def knuth_shuffle[T](ls: list[T]) -> list[T]:
+    length = len(ls)
     for i in range(0, length - 1):
         j = secrets.choice(range(i, length))
-        l[i], l[j] = l[j], l[i]
-    return l
+        ls[i], ls[j] = ls[j], ls[i]
+    return ls
