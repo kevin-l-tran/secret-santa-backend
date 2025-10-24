@@ -43,6 +43,24 @@ def test_create_room_without_name(sio):
     assert len(rooms.ROOMS) == 0
 
 
+def test_create_emit_does_not_leak(make_sios):
+    # Setup
+    host1, host2 = make_sios(2)
+    host1.emit("create_room", {"name": "Alice"})
+    host1.get_received()  # clear host1 queue
+
+    # Act
+    host2.emit("create_room", {"name": "Carol"})
+
+    # Assert: host1 gets nothing
+    a_batch = host1.get_received()
+    assert _get_packet(a_batch, "room_created") is None
+
+    # Assert: host2 gets events
+    b_batch = host2.get_received()
+    assert _get_packet(b_batch, "room_created") is not None
+
+
 def test_create_multiple_rooms_success(make_sios):
     # Setup
     clients = make_sios(100)
@@ -169,6 +187,26 @@ def test_join_room_with_duplicate_name(make_sios):
     assert payload["message"] == "Name already taken"
 
 
+def test_join_emit_does_not_leak(make_sios):
+    # Setup
+    host1, participant, host2 = make_sios(3)
+    host1.emit("create_room", {"name": "Alice"})
+
+    # Act
+    host2.emit("create_room", {"name": "Carol"})
+    received = host2.get_received()
+    rid = _get_packet(received, "room_created")["room_id"]
+    participant.emit("join_room", {"room_id": rid, "name": "Bob"})
+
+    # Assert: host1 gets nothing
+    a_batch = host1.get_received()
+    assert _get_packet(a_batch, "joined") is None
+
+    # Assert: host2 gets events
+    b_batch = host2.get_received()
+    assert _get_packet(b_batch, "joined") is not None
+
+
 def test_multiple_join_room_success(make_sios):
     # Setup
     clients = make_sios(101)
@@ -198,6 +236,159 @@ def test_multiple_join_room_success(make_sios):
     assert len(rooms.ROOMS) == 1
     assert len(rooms.ROOMS[rid].participants) == 101
     assert len(rooms.SID_TO_RID) == 101
+
+
+# ------------ Leave room tests ------------
+def test_disconnect_without_a_room(sio):
+    # Act
+    sio.disconnect()
+
+    # Assert: in-memory state unchanged
+    assert len(rooms.ROOMS) == 0
+    assert len(rooms.SID_TO_RID) == 0
+
+
+def test_leave_room_with_single_participant(sio):
+    # Setup
+    sio.emit("create_room", {"name": "Alice"})
+
+    # Act
+    sio.disconnect()
+
+    # Assert: in-memory state unchanged
+    assert len(rooms.ROOMS) == 0
+    assert len(rooms.SID_TO_RID) == 0
+
+
+def test_participant_leaves_room(make_sios):
+    # Setup
+    sio_host, sio_participant = make_sios(2)
+
+    sio_host.emit("create_room", {"name": "Alice"})
+    received = sio_host.get_received()
+    payload = _get_packet(received, "room_created")
+    rid = payload["room_id"]
+
+    sio_participant.emit("join_room", {"room_id": rid, "name": "Bob"})
+
+    # Drain host queue so we ignore the "Alice+Bob" room_update from join
+    sio_host.get_received()
+
+    # Act
+    sio_participant.disconnect()
+
+    # Assert: event output
+    received = sio_host.get_received()
+
+    payload = _get_packet(received, "disconnected")
+    assert payload is not None, f"Got: {received}"
+    assert payload["name"] == "Bob"
+
+    payload = _get_packet(received, "room_update")
+    assert payload is not None, f"Got: {received}"
+    assert payload["room_id"] == rid
+    assert payload["participants"] == ["Alice"]
+    assert payload["host_name"] == "Alice"
+
+    # Assert: in-memory state updated
+    room = rooms.ROOMS[payload["room_id"]]
+    assert len(rooms.ROOMS) == 1
+    assert len(rooms.ROOMS[rid].participants) == 1
+    assert len(rooms.SID_TO_RID) == 1
+    assert room.host.name == payload["host_name"]
+    assert [p.name for p in room.participants] == ["Alice"]
+
+
+def test_host_leaves_room(make_sios):
+    # Setup
+    sio_host, sio_participant = make_sios(2)
+
+    sio_host.emit("create_room", {"name": "Alice"})
+    received = sio_host.get_received()
+    payload = _get_packet(received, "room_created")
+    rid = payload["room_id"]
+
+    sio_participant.emit("join_room", {"room_id": rid, "name": "Bob"})
+
+    sio_participant.get_received()  # clear participant queue
+
+    # Act
+    sio_host.disconnect()
+
+    # Assert: event output
+    received = sio_participant.get_received()
+
+    payload = _get_packet(received, "host_changed")
+    assert payload is not None, f"Got: {received}"
+    assert payload["host_name"] == "Bob"
+
+    payload = _get_packet(received, "disconnected")
+    assert payload is not None, f"Got: {received}"
+    assert payload["name"] == "Alice"
+
+    payload = _get_packet(received, "room_update")
+    assert payload is not None, f"Got: {received}"
+    assert payload["room_id"] == rid
+    assert payload["participants"] == ["Bob"]
+    assert payload["host_name"] == "Bob"
+
+    # Assert: in-memory state updated
+    room = rooms.ROOMS[payload["room_id"]]
+    assert len(rooms.ROOMS) == 1
+    assert len(rooms.ROOMS[rid].participants) == 1
+    assert len(rooms.SID_TO_RID) == 1
+    assert room.host.name == payload["host_name"]
+    assert [p.name for p in room.participants] == ["Bob"]
+
+
+def test_disconnect_emit_does_not_leak(make_sios):
+    # Setup
+    host1, guest, host2 = make_sios(3)
+
+    host1.emit("create_room", {"name": "Alice"})
+    rid_a = _get_packet(host1.get_received(), "room_created")["room_id"]
+
+    guest.emit("join_room", {"room_id": rid_a, "name": "Bob"})
+    host1.get_received()  # clear host1 queue
+
+    host2.emit("create_room", {"name": "Carol"})
+
+    # Act
+    guest.disconnect()
+
+    # Assert: host1 gets events
+    a_batch = host1.get_received()
+    assert _get_packet(a_batch, "disconnected")["name"] == "Bob"
+    assert _get_packet(a_batch, "room_update") is not None
+
+    # Assert: host2 gets nothing
+    b_batch = host2.get_received()
+    assert _get_packet(b_batch, "disconnected") is None
+    assert _get_packet(b_batch, "room_update") is None
+
+
+def test_multiple_disconnects_success(make_sios):
+    # Setup
+    hosts = make_sios(10)
+    participants = make_sios(100)
+
+    for i, host in enumerate(hosts):
+        host.emit("create_room", {"name": "Alice"})
+        rid = _get_packet(host.get_received(), "room_created")["room_id"]
+
+        group = participants[i * 10 : (i + 1) * 10]
+        for p in group:
+            p.emit("join_room", {"room_id": rid, "name": "Bob"})
+
+    # Act
+    for host in hosts:
+        host.disconnect()
+    for participant in participants:
+        participant.disconnect()
+
+    # Assert: in-memory state unchanged
+    assert len(rooms.ROOMS) == 0
+    assert len(rooms.SID_TO_RID) == 0
 
 
 # ------------ Helpers ------------
